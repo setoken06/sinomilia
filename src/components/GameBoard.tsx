@@ -87,7 +87,12 @@ export default function GameBoard({ state, onSelectCard, onAction }: Props) {
 
       {/* Center Chip Area */}
       <div className="flex-1 flex items-center justify-center">
-        <ChipArea chips={state.round.centerChips} />
+        <ChipArea
+          chips={state.round.centerChips}
+          yourId={state.you.id}
+          yourName={state.you.name}
+          opponentName={state.opponent.name}
+        />
       </div>
 
       {/* Your Area */}

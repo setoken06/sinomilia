@@ -15,8 +15,13 @@ export interface PlayerState {
   usedCards: number[];
 }
 
+export interface PlacedChip {
+  side: ChipSide;
+  playerId: string;
+}
+
 export interface RoundState {
-  centerChips: ChipSide[];
+  centerChips: PlacedChip[];
   startingPlayerId: string;
   currentTurnPlayerId: string;
   lastActionPlayerId: string | null;
@@ -44,6 +49,7 @@ export interface RoundResult {
   loserId: string | null;
   chipsWon: number;
   moonBonus: number;
+  moonBonusDetail: { [playerId: string]: number }; // per-player moon bonus
   revealOrder: [string, string];
 }
 

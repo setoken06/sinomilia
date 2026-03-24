@@ -5,6 +5,7 @@ import {
   RoundState,
   RoundResult,
   ChipSide,
+  PlacedChip,
 } from "./types";
 
 export const STARTING_CHIPS = 15;
@@ -139,7 +140,7 @@ export function performAction(
   switch (action.type) {
     case "place_chip":
       player.chips -= 1;
-      newState.round.centerChips.push(action.side);
+      newState.round.centerChips.push({ side: action.side, playerId });
       newState.round.consecutivePasses = 0;
       newState.round.lastActionPlayerId = playerId;
       newState.round.lastAction = action;
@@ -237,19 +238,21 @@ export function resolveRound(state: GameState): RoundResult {
     }
   }
 
-  // Calculate moon bonus
+  // Calculate moon bonus (winner's own moon chips, based on winner's own chip count)
   let moonBonus = 0;
+  const moonBonusDetail: { [playerId: string]: number } = {};
   if (winnerId && loserId) {
-    const loser = getPlayer(state, loserId);
-    const moonCount = state.round.centerChips.filter(
-      (c) => c === "moon"
+    const winner = getPlayer(state, winnerId);
+    const winnerMoonCount = state.round.centerChips.filter(
+      (c) => c.side === "moon" && c.playerId === winnerId
     ).length;
 
-    if (loser.chips === 0) {
-      moonBonus = moonCount * 5;
-    } else if (loser.chips === 1) {
-      moonBonus = moonCount * 2;
+    if (winner.chips === 0) {
+      moonBonus = winnerMoonCount * 5;
+    } else if (winner.chips === 1) {
+      moonBonus = winnerMoonCount * 2;
     }
+    moonBonusDetail[winnerId] = moonBonus;
   }
 
   const chipsWon = totalChips + VICTORY_BONUS + moonBonus;
@@ -266,6 +269,7 @@ export function resolveRound(state: GameState): RoundResult {
     loserId,
     chipsWon,
     moonBonus,
+    moonBonusDetail,
     revealOrder: [firstRevealer, secondRevealer],
   };
 }
@@ -276,9 +280,19 @@ export function applyRoundResult(
 ): GameState {
   const newState = structuredClone(state);
 
-  if (result.winnerId) {
+  if (result.winnerId && result.loserId) {
     const winner = getPlayer(newState, result.winnerId);
-    winner.chips += result.chipsWon;
+    const loser = getPlayer(newState, result.loserId);
+
+    // Winner receives center chips (already deducted during play)
+    winner.chips += result.totalChips;
+
+    // Victory bonus + moon bonus are transferred from loser to winner
+    const penalty = VICTORY_BONUS + result.moonBonus;
+    const actualPenalty = Math.min(penalty, loser.chips);
+    loser.chips -= actualPenalty;
+    winner.chips += actualPenalty;
+
     newState.lastRoundWinner = result.winnerId;
   }
 
@@ -312,9 +326,10 @@ export function applyRoundResult(
 }
 
 function checkGameOver(state: GameState): boolean {
-  // Any player has 0 chips (after round resolution, so they lost all)
-  // Actually check if hand size <= MIN_HAND_SIZE
   for (const player of state.players) {
+    // チップを全て失った
+    if (player.chips <= 0) return true;
+    // 手札が2枚以下になった
     if (player.hand.length <= MIN_HAND_SIZE) return true;
   }
 

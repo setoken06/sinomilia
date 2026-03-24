@@ -1,12 +1,15 @@
 "use client";
 
-import type { ChipSide } from "@/game/types";
+import type { PlacedChip } from "@/game/types";
 
 interface Props {
-  chips: ChipSide[];
+  chips: PlacedChip[];
+  yourId: string;
+  opponentName: string;
+  yourName: string;
 }
 
-export default function ChipArea({ chips }: Props) {
+export default function ChipArea({ chips, yourId, yourName, opponentName }: Props) {
   if (chips.length === 0) {
     return (
       <div className="text-center">
@@ -18,33 +21,54 @@ export default function ChipArea({ chips }: Props) {
     );
   }
 
-  const sunCount = chips.filter((c) => c === "sun").length;
-  const moonCount = chips.filter((c) => c === "moon").length;
+  const yourChips = chips.filter((c) => c.playerId === yourId);
+  const opponentChips = chips.filter((c) => c.playerId !== yourId);
 
   return (
     <div className="text-center space-y-3">
       <div className="text-5xl font-bold" style={{ color: "var(--accent-gold)" }}>
         {chips.length}
       </div>
-      <div className="flex justify-center gap-1 flex-wrap max-w-[200px]">
+
+      <div className="space-y-2">
+        {/* Opponent's chips */}
+        {opponentChips.length > 0 && (
+          <ChipGroup name={opponentName} chips={opponentChips} />
+        )}
+        {/* Your chips */}
+        {yourChips.length > 0 && (
+          <ChipGroup name={yourName} chips={yourChips} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ChipGroup({ name, chips }: { name: string; chips: PlacedChip[] }) {
+  const sunCount = chips.filter((c) => c.side === "sun").length;
+  const moonCount = chips.filter((c) => c.side === "moon").length;
+
+  return (
+    <div className="flex items-center justify-center gap-2">
+      <span className="text-[10px] text-gray-500 w-16 text-right shrink-0">{name}</span>
+      <div className="flex gap-1">
         {chips.map((chip, i) => (
           <div
             key={i}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
             style={
-              chip === "sun"
+              chip.side === "sun"
                 ? { backgroundColor: "#ff8c00", color: "white" }
                 : { backgroundColor: "#4a4a8a", color: "#c0c0ff" }
             }
           >
-            {chip === "sun" ? "☀" : "☾"}
+            {chip.side === "sun" ? "☀" : "☾"}
           </div>
         ))}
       </div>
-      <div className="flex justify-center gap-3 text-xs text-gray-400">
-        {sunCount > 0 && <span>☀ {sunCount}</span>}
-        {moonCount > 0 && <span>☾ {moonCount}</span>}
-      </div>
+      <span className="text-[10px] text-gray-500 w-12 shrink-0">
+        {sunCount > 0 && `☀${sunCount}`} {moonCount > 0 && `☾${moonCount}`}
+      </span>
     </div>
   );
 }
