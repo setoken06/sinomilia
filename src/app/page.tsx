@@ -14,31 +14,34 @@ export default function Home() {
   const router = useRouter();
   const socket = useSocket();
 
+  // If there's an existing session, offer to rejoin
+  const [hasSession, setHasSession] = useState(false);
+  const [sessionRoomId, setSessionRoomId] = useState("");
+
   useEffect(() => {
-    const onPlayerId = ({ playerId }: { playerId: string }) => {
-      // Save will be completed once we know the roomId in the handler
-      (window as any).__sinomilia_playerId = playerId;
-    };
-    (socket as any).on("player_id", onPlayerId);
-    return () => {
-      (socket as any).off("player_id", onPlayerId);
-    };
-  }, [socket]);
+    const session = getSession();
+    if (session) {
+      setHasSession(true);
+      setSessionRoomId(session.roomId);
+    }
+  }, []);
+
+  const handleRejoinFromTop = () => {
+    const session = getSession();
+    if (session) {
+      router.push(`/game/${session.roomId}`);
+    }
+  };
 
   const handleCreate = () => {
     if (!playerName.trim()) return;
     setError("");
     socket.emit("create_room", { playerName: playerName.trim() });
 
-    socket.once("room_created", ({ roomId }) => {
+    socket.once("room_created", ({ roomId, playerId }) => {
+      saveSession(roomId, playerId);
       setCreatedRoomId(roomId);
       setWaiting(true);
-
-      // Wait a tick for player_id to arrive
-      setTimeout(() => {
-        const playerId = (window as any).__sinomilia_playerId;
-        if (playerId) saveSession(roomId, playerId);
-      }, 100);
 
       socket.once("game_start", () => {
         router.push(`/game/${roomId}`);
@@ -55,11 +58,8 @@ export default function Home() {
       playerName: playerName.trim(),
     });
 
-    socket.once("room_joined", ({ roomId: joinedRoomId }) => {
-      setTimeout(() => {
-        const playerId = (window as any).__sinomilia_playerId;
-        if (playerId) saveSession(joinedRoomId, playerId);
-      }, 100);
+    socket.once("room_joined", ({ roomId: joinedRoomId, playerId }) => {
+      saveSession(joinedRoomId, playerId);
 
       socket.once("game_start", () => {
         router.push(`/game/${joinedRoomId}`);
@@ -80,6 +80,19 @@ export default function Home() {
           </h1>
           <p className="text-gray-400 text-sm">2人対戦カードゲーム</p>
         </div>
+
+        {hasSession && (
+          <div className="p-4 rounded-lg bg-[#16213e] border border-gray-600 space-y-3">
+            <p className="text-sm text-gray-300">進行中のゲームがあります（ルーム: {sessionRoomId}）</p>
+            <button
+              onClick={handleRejoinFromTop}
+              className="w-full py-2 rounded-lg font-bold text-sm"
+              style={{ backgroundColor: "var(--accent-gold)", color: "#1a1a2e" }}
+            >
+              ゲームに復帰する
+            </button>
+          </div>
+        )}
 
         <div className="space-y-4">
           <input
@@ -140,7 +153,7 @@ export default function Home() {
           )}
         </div>
       </div>
-      <div className="fixed bottom-3 right-4 text-xs text-gray-600">v1.0.2</div>
+      <div className="fixed bottom-3 right-4 text-xs text-gray-600">v1.0.3</div>
     </div>
   );
 }

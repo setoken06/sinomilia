@@ -9,126 +9,73 @@ import GameBoard from "@/components/GameBoard";
 import RoundResultView from "@/components/RoundResult";
 import GameResult from "@/components/GameResult";
 
-type PageState = "loading" | "confirm_rejoin" | "playing" | "no_room";
-
 export default function GamePage() {
   const socket = useSocket();
   const router = useRouter();
   const params = useParams();
   const roomId = params.roomId as string;
-  const [pageState, setPageState] = useState<PageState>("loading");
   const [gameState, setGameState] = useState<ClientGameState | null>(null);
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [opponentAway, setOpponentAway] = useState(false);
-  const initialized = useRef(false);
+  const [failed, setFailed] = useState(false);
+  const rejoinAttempted = useRef(false);
 
-  // On mount, check if we have a session or came from lobby
+  // Attempt rejoin on mount
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
+    if (rejoinAttempted.current) return;
+    rejoinAttempted.current = true;
 
     const session = getSession();
 
-    if (session && session.roomId === roomId) {
-      // Have a session for this room - show confirmation
-      setPageState("confirm_rejoin");
-    } else {
-      // Came from lobby - request current state
-      const tryGetState = () => {
-        socket.emit("get_state" as any);
-
-        // If no response within 2 seconds, room doesn't exist
-        const timeout = setTimeout(() => {
-          if (!gameState) {
-            setPageState("no_room");
-          }
-        }, 2000);
-
-        const onState = ({ state }: { state: ClientGameState }) => {
-          clearTimeout(timeout);
-          setGameState(state);
-          setPageState("playing");
-        };
-        socket.once("state_update", onState);
-
-        return () => {
-          clearTimeout(timeout);
-          socket.off("state_update", onState);
-        };
-      };
-
-      if (socket.connected) {
-        tryGetState();
+    const attemptRejoin = () => {
+      if (session && session.roomId === roomId) {
+        socket.emit("rejoin_room", {
+          roomId: session.roomId,
+          playerId: session.playerId,
+        });
       } else {
-        socket.once("connect", tryGetState);
+        // Came from lobby, request current state
+        socket.emit("get_state");
       }
-    }
-  }, [socket, roomId]);
 
-  const handleRejoin = useCallback(() => {
-    const session = getSession();
-    if (!session) {
-      setPageState("no_room");
-      return;
-    }
+      // Timeout: if no state received within 3 seconds, room is gone
+      const timeout = setTimeout(() => {
+        if (!gameState) {
+          clearSession();
+          setFailed(true);
+        }
+      }, 3000);
 
-    setPageState("loading");
-
-    const onState = ({ state }: { state: ClientGameState }) => {
-      clearTimeout(timeout);
-      setGameState(state);
-      setPageState("playing");
-      setOpponentAway(state.opponent.isDisconnected);
-    };
-
-    const onError = () => {
-      clearTimeout(timeout);
-      socket.off("state_update", onState);
-      clearSession();
-      setPageState("no_room");
-    };
-
-    const timeout = setTimeout(() => {
-      socket.off("state_update", onState);
-      socket.off("error", onError);
-      clearSession();
-      setPageState("no_room");
-    }, 3000);
-
-    socket.once("state_update", onState);
-    socket.once("error", onError);
-
-    const doRejoin = () => {
-      socket.emit("rejoin_room" as any, {
-        roomId: session.roomId,
-        playerId: session.playerId,
+      // Clear timeout when state arrives
+      const clearOnState = ({ state }: { state: ClientGameState }) => {
+        clearTimeout(timeout);
+      };
+      socket.once("state_update", clearOnState);
+      socket.once("game_start", () => clearTimeout(timeout));
+      socket.once("error", () => {
+        clearTimeout(timeout);
+        clearSession();
+        setFailed(true);
       });
     };
 
     if (socket.connected) {
-      doRejoin();
+      attemptRejoin();
     } else {
-      socket.once("connect", doRejoin);
+      socket.once("connect", attemptRejoin);
     }
-  }, [socket]);
-
-  const handleDeclineRejoin = useCallback(() => {
-    clearSession();
-    router.push("/");
-  }, [router]);
+  }, [socket, roomId]);
 
   // Game event listeners
   useEffect(() => {
     const onStateUpdate = ({ state }: { state: ClientGameState }) => {
       setGameState(state);
-      setPageState("playing");
       setOpponentAway(state.opponent.isDisconnected);
     };
 
     const onGameStart = ({ state }: { state: ClientGameState }) => {
       setGameState(state);
-      setPageState("playing");
     };
 
     const onRoundEnd = ({
@@ -158,13 +105,8 @@ export default function GamePage() {
       clearSession();
     };
 
-    const onOpponentDisconnected = () => {
-      setOpponentAway(true);
-    };
-
-    const onOpponentReconnected = () => {
-      setOpponentAway(false);
-    };
+    const onOpponentDisconnected = () => setOpponentAway(true);
+    const onOpponentReconnected = () => setOpponentAway(false);
 
     socket.on("game_start", onGameStart);
     socket.on("state_update", onStateUpdate);
@@ -184,54 +126,35 @@ export default function GamePage() {
   }, [socket]);
 
   const handleSelectCard = useCallback(
-    (card: number) => {
-      socket.emit("select_card", { card });
-    },
+    (card: number) => socket.emit("select_card", { card }),
     [socket]
   );
 
   const handleAction = useCallback(
-    (action: PlayerAction) => {
-      socket.emit("action", action);
-    },
+    (action: PlayerAction) => socket.emit("action", action),
     [socket]
   );
 
   // --- Render ---
 
-  if (pageState === "confirm_rejoin") {
+  if (failed) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="text-center space-y-6">
-          <p className="text-xl text-gray-300">進行中のゲームがあります</p>
-          <p className="text-sm text-gray-500">ルーム: {roomId}</p>
-          <div className="flex gap-4 justify-center">
-            <button
-              onClick={handleRejoin}
-              className="px-6 py-3 rounded-lg font-bold text-lg"
-              style={{ backgroundColor: "var(--accent-gold)", color: "#1a1a2e" }}
-            >
-              復帰する
-            </button>
-            <button
-              onClick={handleDeclineRejoin}
-              className="px-6 py-3 rounded-lg font-bold text-lg bg-gray-700 text-gray-300"
-            >
-              トップに戻る
-            </button>
-          </div>
+        <div className="text-center space-y-4">
+          <p className="text-xl text-gray-300">ルームが見つかりません</p>
+          <a
+            href="/"
+            className="inline-block px-6 py-3 rounded-lg font-bold"
+            style={{ backgroundColor: "var(--accent-gold)", color: "#1a1a2e" }}
+          >
+            トップに戻る
+          </a>
         </div>
       </div>
     );
   }
 
-  if (pageState === "no_room") {
-    clearSession();
-    router.push("/");
-    return null;
-  }
-
-  if (pageState === "loading" || !gameState) {
+  if (!gameState) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-xl text-gray-400">接続中...</p>

@@ -65,9 +65,7 @@ export function setupSocketHandlers(io: TypedServer): void {
     socket.on("create_room", ({ playerName }) => {
       const { roomId, playerId } = createRoom(socket.id, playerName);
       socket.join(roomId);
-      socket.emit("room_created", { roomId });
-      // Send playerId to client for reconnection
-      (socket as any).emit("player_id", { playerId });
+      socket.emit("room_created", { roomId, playerId });
     });
 
     socket.on("join_room", ({ roomId, playerName }) => {
@@ -79,8 +77,7 @@ export function setupSocketHandlers(io: TypedServer): void {
 
       const { room, playerId } = result;
       socket.join(roomId);
-      socket.emit("room_joined", { roomId });
-      (socket as any).emit("player_id", { playerId });
+      socket.emit("room_joined", { roomId, playerId });
 
       const state = room.gameState!;
       for (const player of room.players) {

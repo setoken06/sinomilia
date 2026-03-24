@@ -12,18 +12,18 @@ export function getSocket(): TypedSocket {
   return socket;
 }
 
-// Persist player/room identity for reconnection
+// Persist player/room identity for reconnection (survives tab close)
 export function saveSession(roomId: string, playerId: string): void {
   try {
-    sessionStorage.setItem("sinomilia_roomId", roomId);
-    sessionStorage.setItem("sinomilia_playerId", playerId);
+    localStorage.setItem("sinomilia_roomId", roomId);
+    localStorage.setItem("sinomilia_playerId", playerId);
   } catch {}
 }
 
 export function getSession(): { roomId: string; playerId: string } | null {
   try {
-    const roomId = sessionStorage.getItem("sinomilia_roomId");
-    const playerId = sessionStorage.getItem("sinomilia_playerId");
+    const roomId = localStorage.getItem("sinomilia_roomId");
+    const playerId = localStorage.getItem("sinomilia_playerId");
     if (roomId && playerId) return { roomId, playerId };
   } catch {}
   return null;
@@ -31,7 +31,7 @@ export function getSession(): { roomId: string; playerId: string } | null {
 
 export function clearSession(): void {
   try {
-    sessionStorage.removeItem("sinomilia_roomId");
-    sessionStorage.removeItem("sinomilia_playerId");
+    localStorage.removeItem("sinomilia_roomId");
+    localStorage.removeItem("sinomilia_playerId");
   } catch {}
 }

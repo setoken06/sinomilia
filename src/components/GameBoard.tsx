@@ -33,7 +33,13 @@ export default function GameBoard({ state, onSelectCard, onAction }: Props) {
     <div className="min-h-screen flex flex-col p-3 max-w-lg mx-auto select-none">
       {/* Header */}
       <div className="text-center py-2">
-        <span className="text-xs text-gray-500">ラウンド {state.roundNumber}</span>
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-xs text-gray-500">ラウンド {state.roundNumber}</span>
+          <span className="text-xs text-gray-600">|</span>
+          <span className="text-xs" style={{ color: state.round.startingPlayerId === state.you.id ? "var(--accent-gold)" : "var(--accent-blue)" }}>
+            {state.round.startingPlayerId === state.you.id ? "あなたが先手" : "相手が先手"}
+          </span>
+        </div>
         {isCardSelect && !state.you.selectedCard && (
           <p className="text-sm mt-1" style={{ color: "var(--accent-gold)" }}>
             カードを選んでください

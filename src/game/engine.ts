@@ -311,13 +311,11 @@ export function applyRoundResult(
     newState.phase = "game_over";
     newState.winner = determineWinner(newState);
   } else {
-    // Start new round
+    // Start new round - loser of previous round goes first
     newState.roundNumber += 1;
-    // Alternate starting player
-    const nextStarter = getOtherPlayerId(
-      newState,
-      newState.round.startingPlayerId
-    );
+    const nextStarter = result.loserId
+      ? result.loserId
+      : getOtherPlayerId(newState, newState.round.startingPlayerId);
     newState.round = createRoundState(nextStarter);
     newState.phase = "card_select";
   }

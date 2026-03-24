@@ -75,8 +75,8 @@ export interface ClientGameState {
 
 // Socket events
 export interface ServerToClientEvents {
-  room_created: (data: { roomId: string }) => void;
-  room_joined: (data: { roomId: string }) => void;
+  room_created: (data: { roomId: string; playerId: string }) => void;
+  room_joined: (data: { roomId: string; playerId: string }) => void;
   game_start: (data: { state: ClientGameState }) => void;
   state_update: (data: { state: ClientGameState }) => void;
   round_end: (data: { result: RoundResult; state: ClientGameState }) => void;
