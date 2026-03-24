@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSocket } from "@/hooks/useSocket";
+import { saveSession, getSession } from "@/lib/socket";
 
 export default function Home() {
   const [playerName, setPlayerName] = useState("");
@@ -13,6 +14,25 @@ export default function Home() {
   const router = useRouter();
   const socket = useSocket();
 
+  // Check for existing session to rejoin
+  useEffect(() => {
+    const session = getSession();
+    if (session) {
+      router.push(`/game/${session.roomId}`);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    const onPlayerId = ({ playerId }: { playerId: string }) => {
+      // Save will be completed once we know the roomId in the handler
+      (window as any).__sinomilia_playerId = playerId;
+    };
+    (socket as any).on("player_id", onPlayerId);
+    return () => {
+      (socket as any).off("player_id", onPlayerId);
+    };
+  }, [socket]);
+
   const handleCreate = () => {
     if (!playerName.trim()) return;
     setError("");
@@ -21,6 +41,12 @@ export default function Home() {
     socket.once("room_created", ({ roomId }) => {
       setCreatedRoomId(roomId);
       setWaiting(true);
+
+      // Wait a tick for player_id to arrive
+      setTimeout(() => {
+        const playerId = (window as any).__sinomilia_playerId;
+        if (playerId) saveSession(roomId, playerId);
+      }, 100);
 
       socket.once("game_start", () => {
         router.push(`/game/${roomId}`);
@@ -31,14 +57,20 @@ export default function Home() {
   const handleJoin = () => {
     if (!playerName.trim() || !roomId.trim()) return;
     setError("");
+    const targetRoom = roomId.trim().toUpperCase();
     socket.emit("join_room", {
-      roomId: roomId.trim().toUpperCase(),
+      roomId: targetRoom,
       playerName: playerName.trim(),
     });
 
-    socket.once("room_joined", ({ roomId }) => {
+    socket.once("room_joined", ({ roomId: joinedRoomId }) => {
+      setTimeout(() => {
+        const playerId = (window as any).__sinomilia_playerId;
+        if (playerId) saveSession(joinedRoomId, playerId);
+      }, 100);
+
       socket.once("game_start", () => {
-        router.push(`/game/${roomId}`);
+        router.push(`/game/${joinedRoomId}`);
       });
     });
 

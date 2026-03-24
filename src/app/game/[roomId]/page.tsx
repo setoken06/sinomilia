@@ -1,25 +1,56 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useParams } from "next/navigation";
 import { useSocket } from "@/hooks/useSocket";
-import type { ClientGameState, RoundResult } from "@/game/types";
+import { getSession, clearSession } from "@/lib/socket";
+import type { ClientGameState, RoundResult, PlayerAction } from "@/game/types";
 import GameBoard from "@/components/GameBoard";
 import RoundResultView from "@/components/RoundResult";
 import GameResult from "@/components/GameResult";
 
 export default function GamePage() {
   const socket = useSocket();
+  const params = useParams();
+  const roomId = params.roomId as string;
   const [gameState, setGameState] = useState<ClientGameState | null>(null);
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null);
   const [showResult, setShowResult] = useState(false);
-  const [disconnected, setDisconnected] = useState(false);
+  const [opponentAway, setOpponentAway] = useState(false);
+  const initialized = useRef(false);
 
   useEffect(() => {
-    const onGameStart = ({ state }: { state: ClientGameState }) => {
-      setGameState(state);
+    if (initialized.current) return;
+    initialized.current = true;
+
+    const init = () => {
+      const session = getSession();
+      if (session && session.roomId === roomId) {
+        // Rejoin with saved identity
+        socket.emit("rejoin_room" as any, {
+          roomId: session.roomId,
+          playerId: session.playerId,
+        });
+      } else {
+        // Request current state (for initial navigation from lobby)
+        socket.emit("get_state" as any);
+      }
     };
 
+    if (socket.connected) {
+      init();
+    } else {
+      socket.once("connect", init);
+    }
+  }, [socket, roomId]);
+
+  useEffect(() => {
     const onStateUpdate = ({ state }: { state: ClientGameState }) => {
+      setGameState(state);
+      setOpponentAway(state.opponent.isDisconnected);
+    };
+
+    const onGameStart = ({ state }: { state: ClientGameState }) => {
       setGameState(state);
     };
 
@@ -32,7 +63,6 @@ export default function GamePage() {
     }) => {
       setRoundResult(result);
       setShowResult(true);
-      // After animation, update to next state
       setTimeout(() => {
         setShowResult(false);
         setRoundResult(null);
@@ -48,24 +78,31 @@ export default function GamePage() {
       finalChips: { [playerId: string]: number };
     }) => {
       setGameState(state);
+      clearSession();
     };
 
-    const onDisconnect = () => {
-      setDisconnected(true);
+    const onOpponentDisconnected = () => {
+      setOpponentAway(true);
+    };
+
+    const onOpponentReconnected = () => {
+      setOpponentAway(false);
     };
 
     socket.on("game_start", onGameStart);
     socket.on("state_update", onStateUpdate);
     socket.on("round_end", onRoundEnd);
     socket.on("game_over", onGameOver);
-    socket.on("opponent_disconnected", onDisconnect);
+    socket.on("opponent_disconnected", onOpponentDisconnected);
+    socket.on("opponent_reconnected", onOpponentReconnected);
 
     return () => {
       socket.off("game_start", onGameStart);
       socket.off("state_update", onStateUpdate);
       socket.off("round_end", onRoundEnd);
       socket.off("game_over", onGameOver);
-      socket.off("opponent_disconnected", onDisconnect);
+      socket.off("opponent_disconnected", onOpponentDisconnected);
+      socket.off("opponent_reconnected", onOpponentReconnected);
     };
   }, [socket]);
 
@@ -77,28 +114,11 @@ export default function GamePage() {
   );
 
   const handleAction = useCallback(
-    (action: Parameters<typeof socket.emit<"action">>[1]) => {
+    (action: PlayerAction) => {
       socket.emit("action", action);
     },
     [socket]
   );
-
-  if (disconnected) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <p className="text-2xl text-red-400">相手が切断しました</p>
-          <a
-            href="/"
-            className="inline-block px-6 py-3 rounded-lg font-bold"
-            style={{ backgroundColor: "var(--accent-gold)", color: "#1a1a2e" }}
-          >
-            トップに戻る
-          </a>
-        </div>
-      </div>
-    );
-  }
 
   if (!gameState) {
     return (
@@ -110,10 +130,7 @@ export default function GamePage() {
 
   if (showResult && roundResult) {
     return (
-      <RoundResultView
-        result={roundResult}
-        yourId={gameState.you.id}
-      />
+      <RoundResultView result={roundResult} yourId={gameState.you.id} />
     );
   }
 
@@ -122,10 +139,17 @@ export default function GamePage() {
   }
 
   return (
-    <GameBoard
-      state={gameState}
-      onSelectCard={handleSelectCard}
-      onAction={handleAction}
-    />
+    <>
+      {opponentAway && (
+        <div className="fixed top-0 left-0 right-0 bg-yellow-600/90 text-center py-2 text-sm font-bold z-50">
+          相手が離席中...
+        </div>
+      )}
+      <GameBoard
+        state={gameState}
+        onSelectCard={handleSelectCard}
+        onAction={handleAction}
+      />
+    </>
   );
 }

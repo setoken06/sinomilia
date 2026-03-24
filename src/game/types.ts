@@ -12,6 +12,7 @@ export interface PlayerState {
   chips: number;
   selectedCard: number | null;
   hasChangedThisRound: boolean;
+  usedCards: number[];
 }
 
 export interface RoundState {
@@ -43,7 +44,7 @@ export interface RoundResult {
   loserId: string | null;
   chipsWon: number;
   moonBonus: number;
-  revealOrder: [string, string]; // first reveals, then second
+  revealOrder: [string, string];
 }
 
 export interface ClientGameState {
@@ -56,6 +57,8 @@ export interface ClientGameState {
     chips: number;
     hasSelectedCard: boolean;
     hasChangedThisRound: boolean;
+    usedCards: number[];
+    isDisconnected: boolean;
   };
   round: RoundState;
   roundNumber: number;
@@ -77,12 +80,15 @@ export interface ServerToClientEvents {
     finalChips: { [playerId: string]: number };
   }) => void;
   opponent_disconnected: () => void;
+  opponent_reconnected: () => void;
   error: (data: { message: string }) => void;
 }
 
 export interface ClientToServerEvents {
   create_room: (data: { playerName: string }) => void;
   join_room: (data: { roomId: string; playerName: string }) => void;
+  rejoin_room: (data: { roomId: string; playerId: string }) => void;
+  get_state: () => void;
   select_card: (data: { card: number }) => void;
   action: (data: PlayerAction) => void;
 }

@@ -7,7 +7,7 @@ import {
   ChipSide,
 } from "./types";
 
-export const STARTING_CHIPS = 5;
+export const STARTING_CHIPS = 15;
 export const MAX_CENTER_CHIPS = 9;
 export const MIN_HAND_SIZE = 2;
 export const VICTORY_BONUS = 2;
@@ -16,10 +16,11 @@ export function createPlayer(id: string, name: string): PlayerState {
   return {
     id,
     name,
-    hand: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    hand: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
     chips: STARTING_CHIPS,
     selectedCard: null,
     hasChangedThisRound: false,
+    usedCards: [],
   };
 }
 
@@ -162,10 +163,7 @@ export function performAction(
       if (newState.round.firstPassPlayerId === null) {
         newState.round.firstPassPlayerId = playerId;
       }
-      // Pass after change also counts as last action for reveal order
-      if (!newState.round.changeJustPerformed) {
-        newState.round.lastActionPlayerId = playerId;
-      }
+      // パスはアクションに含まれない — lastActionPlayerIdは更新しない
       newState.round.lastAction = action;
       break;
   }
@@ -284,9 +282,12 @@ export function applyRoundResult(
     newState.lastRoundWinner = result.winnerId;
   }
 
-  // Remove used cards from hands
+  // Remove used cards from hands (9 can be reused)
   for (const player of newState.players) {
-    player.hand = player.hand.filter((c) => c !== player.selectedCard);
+    if (player.selectedCard !== 9) {
+      player.hand = player.hand.filter((c) => c !== player.selectedCard);
+      player.usedCards.push(player.selectedCard!);
+    }
     player.selectedCard = null;
     player.hasChangedThisRound = false;
   }

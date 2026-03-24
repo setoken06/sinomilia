@@ -53,24 +53,36 @@ export default function GameBoard({ state, onSelectCard, onAction }: Props) {
       </div>
 
       {/* Opponent Area */}
-      <div className="flex items-center justify-between px-2 py-3 rounded-lg bg-[#16213e]/50 mb-3">
-        <div>
-          <p className="text-sm font-bold text-gray-300">{state.opponent.name}</p>
-          <p className="text-xs text-gray-500">手札: {state.opponent.handCount}枚</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {state.opponent.hasSelectedCard && (
-            <div className="w-10 h-14 rounded border-2 border-gray-500 bg-gray-700 flex items-center justify-center text-xs text-gray-400">
-              ?
+      <div className="px-2 py-3 rounded-lg bg-[#16213e]/50 mb-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-gray-300">{state.opponent.name}</p>
+            <p className="text-xs text-gray-500">手札: {state.opponent.handCount}枚</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {state.opponent.hasSelectedCard && (
+              <div className="w-10 h-14 rounded border-2 border-gray-500 bg-gray-700 flex items-center justify-center text-xs text-gray-400">
+                ?
+              </div>
+            )}
+            <div className="text-center">
+              <div className="text-2xl font-bold" style={{ color: "var(--accent-gold)" }}>
+                {state.opponent.chips}
+              </div>
+              <div className="text-[10px] text-gray-500">チップ</div>
             </div>
-          )}
-          <div className="text-center">
-            <div className="text-2xl font-bold" style={{ color: "var(--accent-gold)" }}>
-              {state.opponent.chips}
-            </div>
-            <div className="text-[10px] text-gray-500">チップ</div>
           </div>
         </div>
+        {state.opponent.usedCards.length > 0 && (
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-gray-500 mr-1">使用済:</span>
+            {state.opponent.usedCards.sort((a, b) => a - b).map((c, i) => (
+              <span key={i} className="text-xs text-gray-500 bg-gray-700/50 px-1.5 py-0.5 rounded">
+                {c}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Center Chip Area */}
@@ -81,6 +93,18 @@ export default function GameBoard({ state, onSelectCard, onAction }: Props) {
       {/* Your Area */}
       <div className="space-y-3 pb-4">
         {/* Your info */}
+        <div className="space-y-1 px-2">
+        {state.you.usedCards.length > 0 && (
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-gray-500 mr-1">使用済:</span>
+            {state.you.usedCards.sort((a, b) => a - b).map((c, i) => (
+              <span key={i} className="text-xs text-gray-500 bg-gray-700/50 px-1.5 py-0.5 rounded">
+                {c}
+              </span>
+            ))}
+          </div>
+        )}
+        </div>
         <div className="flex items-center justify-between px-2">
           <div>
             <p className="text-sm font-bold text-white">{state.you.name}</p>
