@@ -14,14 +14,6 @@ export default function Home() {
   const router = useRouter();
   const socket = useSocket();
 
-  // Check for existing session to rejoin
-  useEffect(() => {
-    const session = getSession();
-    if (session) {
-      router.push(`/game/${session.roomId}`);
-    }
-  }, [router]);
-
   useEffect(() => {
     const onPlayerId = ({ playerId }: { playerId: string }) => {
       // Save will be completed once we know the roomId in the handler
@@ -148,7 +140,7 @@ export default function Home() {
           )}
         </div>
       </div>
-      <div className="fixed bottom-3 right-4 text-xs text-gray-600">v1.0.1</div>
+      <div className="fixed bottom-3 right-4 text-xs text-gray-600">v1.0.2</div>
     </div>
   );
 }
